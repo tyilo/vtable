@@ -61,7 +61,7 @@ impl<const N: usize> Debug for VTable<N> {
 #[macro_export]
 macro_rules! read_vtable {
     ($trait:path, $n:expr, $v:expr) => {{
-        fn read_vtable(v: &dyn $trait) -> &'static $crate::VTable<$n> {
+        unsafe fn read_vtable(v: &dyn $trait) -> &'static $crate::VTable<$n> {
             let ptr = v as *const dyn $trait;
             let fat_ptr = unsafe { std::mem::transmute::<_, [*const (); 2]>(ptr) };
             unsafe { &*(fat_ptr[1] as *const $crate::VTable<$n>) }
@@ -93,7 +93,7 @@ mod test {
     use super::*;
 
     fn test_vtable_size_and_align<T: Dyn>(v: &T) {
-        let vtable = read_vtable!(crate::Dyn, 0, v);
+        let vtable = unsafe { read_vtable!(crate::Dyn, 0, v) };
         assert_eq!(vtable.size, std::mem::size_of::<T>());
         assert_eq!(vtable.align, std::mem::align_of::<T>());
     }
@@ -148,7 +148,7 @@ mod test {
     #[test]
     fn test_virutal_function() {
         let test = Test(3, 4);
-        let vtable = read_vtable!(TestTrait, 1, &test);
+        let vtable = unsafe { read_vtable!(TestTrait, 1, &test) };
         dbg!(vtable);
 
         let as_ptr_f = vtable.functions[0];
@@ -190,7 +190,7 @@ mod test {
     #[test]
     fn test_multiple_virtual_functions() {
         let v = Test(1, 2);
-        let vtable = read_vtable!(ManyFunctions, 5, &v);
+        let vtable = unsafe { read_vtable!(ManyFunctions, 5, &v) };
         eprintln!("{:#?}", vtable);
 
         for (f, expected) in vtable.functions.into_iter().zip(["c", "e", "a", "b", "d"]) {
